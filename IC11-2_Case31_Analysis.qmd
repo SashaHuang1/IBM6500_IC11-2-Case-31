@@ -1,0 +1,139 @@
+---
+title: "Case 31: Employees Federal Credit Union"
+subtitle: "IC11-2 | R1, R2, R5, and R6"
+format:
+  revealjs:
+    theme: simple
+    slide-number: true
+    transition: slide
+    smaller: true
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+library(haven)
+library(dplyr)
+library(knitr)
+file <- "Case 31 Data_efcu_4.sav"
+dat <- read_sav(file)
+names(dat) <- toupper(names(dat))
+# The cleaned file includes recoded variables; do not activate SPSS FILTER_$.
+valid <- function(x, allowed) as.numeric(x)[as.numeric(x) %in% allowed]
+one_t <- function(v, null=3) {
+ x <- valid(dat[[v]], 1:5)
+ tt <- t.test(x, mu=null)
+ data.frame(Variable=v, N=length(x), Mean=round(mean(x),2),
+ SD=round(sd(x),2), t=round(unname(tt$statistic),2),
+ df=unname(tt$parameter), p=signif(tt$p.value,3))
+}
+gof <- function(v, allowed) {
+ x <- valid(dat[[v]], allowed)
+ counts <- table(factor(x, levels=allowed))
+ test <- chisq.test(counts, p=rep(1/length(allowed),length(allowed)))
+ data.frame(Variable=v, t(as.data.frame.list(as.list(as.integer(counts)))),
+ Chi_square=round(unname(test$statistic),2), df=unname(test$parameter),
+ p=signif(test$p.value,3), check.names=FALSE)
+}
+```
+
+## Case Background and Objectives
+
+- Employees Federal Credit Union (EFCU) commissioned a member survey to investigate borrowing decisions, service awareness, and operational performance.
+- The case describes a random sample of 300 members; **128 usable cases** appear in the supplied cleaned SPSS dataset.
+- Analyses use available valid responses for each question; two-sided tests use α = .05.
+
+## R1 — Why Do People Join the Credit Union?
+
+**Important limitation:** The assignment key assigns Q7 to R1, but the questionnaire defines Q7 as *opinions about rates paid on share/savings accounts*, not reasons for joining. The actual reasons-for-joining item is Q2, which is absent from the supplied cleaned dataset.
+
+```{r}
+kable(one_t("Q7_R"), caption="Proxy analysis specified by assignment key: recoded Q7")
+```
+
+- Q7r mean = 3.07, n = 118; no significant difference from the neutral midpoint (p = .196).
+- This does **not** establish the reasons members joined; Q2 data would be required.
+
+## R2 — Why Use Other Financial Institutions for Loans?
+
+- Q8r: perceived credit-union borrowing rates (recoded, higher = more favorable).
+- Q30: agreement that EFCU loan rates are lower than competing institutions.
+
+```{r}
+kable(bind_rows(one_t("Q8_R"), one_t("Q30")))
+```
+
+- Q8r is not significantly different from neutral at α = .05 (p = .058).
+- Q30 also does not differ significantly from neutral (p = .416).
+- **Limitation:** Q29 directly asks why respondents borrowed elsewhere, but is not included in the provided cleaned dataset; rate perceptions are indirect evidence only.
+
+## R5 — Awareness of EFCU Services
+
+1 = aware and used; 2 = aware but not used; 3 = unaware.
+
+```{r}
+service_vars <- paste0("Q",13:26,"_R")
+service_names <- c("Regular share", "Special subaccounts", "Christmas club",
+ "Individual retirement", "MasterCard", "Signature loans", "New car loans",
+ "Late model car loans", "Older model car loans", "Household goods loans",
+ "Recreational loans", "Share collateral loans", "IRA loans", "Line of credit")
+service_counts <- lapply(service_vars, function(v) {
+ x <- valid(dat[[v]], 1:3)
+ tab <- table(factor(x, levels=1:3))
+ test <- chisq.test(tab)
+ data.frame(Variable=v, Used=unname(tab[1]), Aware_not_used=unname(tab[2]),
+ Unaware=unname(tab[3]), Chi_square=round(unname(test$statistic),2),
+ p=signif(test$p.value,3))
+}) |> bind_rows()
+service_counts$Service <- service_names
+kable(service_counts[,c("Service","Used","Aware_not_used","Unaware","Chi_square","p")])
+```
+
+## R5 — Interpretation
+
+- Regular share accounts have the highest reported use (83/128 = 64.8%).
+- Signature loans and new-car loans are known but rarely used (104 and 99 aware nonusers, respectively).
+- Line-of-credit loans show no reported use and 48/128 (37.5%) unaware respondents.
+- All 14 equal-proportion goodness-of-fit tests reject a uniform distribution (p < .001); **this does not test overall awareness against a benchmark**.
+
+## R6 — Operations: Statements and Privacy
+
+```{r}
+ops_cat <- bind_rows(gof("Q9_R",1:5), gof("Q10_R",1:5))
+kable(ops_cat)
+kable(bind_rows(gof("Q11",1:2),gof("Q12",1:2)))
+```
+
+- Q9r and Q10r: distributions differ from equal category proportions (both p < .001).
+- Q11: 125/128 (97.7%) report statements are easy to understand.
+- Q12: among 106 valid answers, 74 (69.8%) believe account information is maintained confidentially.
+- Goodness-of-fit uses an equal-proportions reference, not a business performance target.
+
+## R6 — Operational Attitudes and Overall Rating
+
+```{r}
+kable(bind_rows(lapply(c("Q31","Q32","Q33","Q34","Q37_R"), one_t)))
+```
+
+- Q31–Q34 agreement averages exceed neutral (all p < .001).
+- The recoded overall operational rating (Q37r) averages 4.07/5, significantly above neutral (p < .001).
+- The questionnaire's raw Q37 uses reverse direction; the analysis uses **Q37_R**, with higher values representing a better rating.
+
+## Conclusions and Recommendations
+
+- **R1:** Direct joining motivations cannot be established without Q2.
+- **R2:** The available rate-perception measures are near neutral; the direct borrowing-reason question Q29 is missing.
+- **R5:** Awareness is uneven, and several loan products are rarely used; target communication toward less familiar services.
+- **R6:** Members generally report favorable operational perceptions, while privacy confidence has room to improve.
+- Results describe the respondents and should not be interpreted as causal evidence.
+
+## Appendix — Sources and Publication
+
+- Case 31: *Employees Federal Credit Union*, case narrative and questionnaire, pp. 705–709.
+- *Data Analysis Table: Assignment Keys*, Case 31, pp. 1–2.
+- Supplied cleaned SPSS file: `Case 31 Data_efcu_4 (2).sav`.
+- Statistical decisions: two-sided one-sample t tests vs 3; chi-square goodness-of-fit vs equal category proportions; α = .05.
+- GitHub Repository: **[ADD YOUR REPOSITORY URL]**
+- GitHub Pages: **[ADD YOUR PUBLISHED URL]**
